@@ -3,4 +3,4 @@ project(HuePi C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_executable(HuePi main.c)
+add_executable(HuePi hueDriver.c multicastListener.c huePi.h)
