@@ -4,66 +4,50 @@
  * This is the main driver for running and testing the philips hue bridge controller application
  */
 
-
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include "huePi.h"
 
 int main(int argc, char **argv)
 {
+
+    // ************************* SET UP ********************************
     //Initializes multicast group IP address
     char mCastGroup[] = "239.255.255.250";
 
     //Initializes SSDP port for multicast group. Hue bridges use SSDP for connections.
     char ssdpPort[] = "1900";
 
-    int sfd;
-    int numbytes;
-    struct addrinfo hints, *bridgeInfo, *p;
+    //********************** GETTING IP ADDRESS ***********************
 
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_DGRAM;
+    printf("Multicasting in SSDP port on local network...\n\n");
 
-    if(getaddrinfo(mCastGroup, ssdpPort, &hints, &bridgeInfo) == -1)
+    char *hueIP = NULL;
+
+    hueIP = hueDiscoverySender(mCastGroup, ssdpPort);
+    if(hueIP == NULL)
     {
-        perror("ERROR - Could not get addr info");
-        exit(1);
+        return -1;
     }
 
-    for(p = bridgeInfo; p!= NULL; p = p->ai_next)
-    {
-        if((sfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1)
-        {
-            perror("Error creating socket");
-            continue;
-        }
+    printf("IP address is %s\n\n", hueIP);
 
-        break;
+    //********************* AUTHORIZATION ***********************
+    /*
+    char *clientkey;
+
+    printf("To authorize application with Hue Bridge, press the bridge's link button\n"
+           "at most 30 seconds before starting the authorization, then press enter\n\n");
+
+    getchar();
+
+    printf("Authorizing...\n\n");
+
+    clientkey = hueAuthorize(hueIP);
+    if(clientkey == NULL)
+    {
+        return -1;
     }
 
-    if(p == NULL)
-    {
-        perror("ERROR - Failed to create working socket");
-        exit(1);
-    }
-
-    printf("Multicasting in SSDP port on local network...\n");
-
-    char *s = NULL;
-
-    s = hueDiscoverySender(sfd, p);
-
-    printf("IP address is %s\n", s);
-
-    free(s);
-
+    printf("Client key is %s\n\n", clientkey);
+    */
     return 0;
 }

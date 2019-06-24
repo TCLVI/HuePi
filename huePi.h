@@ -12,6 +12,17 @@
 #include <arpa/inet.h>
 #include <time.h>
 
-char* hueDiscoverySender(int sfd, struct addrinfo *sockInfo);
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#include "cJSON.h"
+
+char* hueDiscoverySender(char *ip, char *port);
+
+const cJSON* hue_httpPOST(char *ip, char *URI, char *fields, cJSON *body);
+
+char * hueAuthorize(char *ip);
 
 #endif //HUEPI_HUEPI_H
