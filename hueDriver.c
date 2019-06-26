@@ -31,15 +31,15 @@ int main(int argc, char **argv)
     printf("IP address is %s\n\n", hueIP);
 
     //********************* AUTHORIZATION ***********************
-    /*
+
     char *clientkey;
 
     printf("To authorize application with Hue Bridge, press the bridge's link button\n"
-           "at most 30 seconds before starting the authorization, then press enter\n\n");
+           "at most 30 seconds before starting the authorization, then press enter ~$");
 
     getchar();
 
-    printf("Authorizing...\n\n");
+    printf("\nAuthorizing...\n\n");
 
     clientkey = hueAuthorize(hueIP);
     if(clientkey == NULL)
@@ -48,6 +48,6 @@ int main(int argc, char **argv)
     }
 
     printf("Client key is %s\n\n", clientkey);
-    */
+
     return 0;
 }

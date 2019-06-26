@@ -13,8 +13,8 @@
 //Returns null on error
 char * hueDiscoverySender(char *ip, char *port)
 {
-    int sfd_mcast;
-    int numbytes;
+    int sfd_mcast = -1;
+    ssize_t numbytes;
     struct addrinfo hints, *bridgeInfo, *p;
     char *s = NULL;
     fd_set readSet;
@@ -32,7 +32,7 @@ char * hueDiscoverySender(char *ip, char *port)
 
     if(getaddrinfo(ip, port, &hints, &bridgeInfo) == -1)
     {
-        perror("ERROR - Could not get addr info");
+        perror("ERROR - Could not get addr info:");
         return NULL;
     }
 
@@ -40,7 +40,7 @@ char * hueDiscoverySender(char *ip, char *port)
     {
         if((sfd_mcast = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1)
         {
-            perror("Error creating socket");
+            perror("ERROR - Creating socket:");
             continue;
         }
 
@@ -51,7 +51,7 @@ char * hueDiscoverySender(char *ip, char *port)
 
     if(p == NULL)
     {
-        perror("ERROR - Failed to create working socket");
+        perror("ERROR - Failed to create working socket:");
         return NULL;
     }
 
@@ -65,7 +65,7 @@ char * hueDiscoverySender(char *ip, char *port)
 
     if((sendto(sfd_mcast, msg, strlen(msg), 0, bridgeInfo->ai_addr, bridgeInfo->ai_addrlen) == -1))
     {
-        perror("ERROR - Failed to sendto");
+        perror("ERROR - Failed to sendto:");
         return NULL;
     }
 
@@ -75,10 +75,10 @@ char * hueDiscoverySender(char *ip, char *port)
 
 
 
-    //Loops three times, making a 15 second timeout for device discovery
-    for(int i = 0; i < 3; i++)
+    //i value represents 5 seconds of timeout before multicasting the packet again
+    for(int i = 0; i < 5; i++)
     {
-        timeout.tv_sec = 5;
+        timeout.tv_sec = 3;
         timeout.tv_usec = 0;
 
         FD_ZERO(&readSet);
@@ -88,7 +88,7 @@ char * hueDiscoverySender(char *ip, char *port)
 
         if(retval == -1)
         {
-            perror("ERROR - Select");
+            perror("ERROR - Select:");
         }
         else if(retval)
         {
@@ -98,14 +98,14 @@ char * hueDiscoverySender(char *ip, char *port)
 
         if((sendto(sfd_mcast, msg, strlen(msg), 0, bridgeInfo->ai_addr, bridgeInfo->ai_addrlen) == -1))
         {
-            perror("ERROR - Failed to sendto");
+            perror("ERROR - Failed to sendto:");
             return NULL;
         }
     }
 
     if(gotResponse == 0)
     {
-        perror("Discovery timeout. Closing Program...");
+        printf("Discovery timeout. Closing Program...");
         return NULL;
     }
 
@@ -115,7 +115,7 @@ char * hueDiscoverySender(char *ip, char *port)
 
     if(numbytes <= 0)
     {
-        perror("ERROR - Could not receive from socket");
+        perror("ERROR - Could not receive from socket:");
         return NULL;
     }
 
@@ -124,7 +124,7 @@ char * hueDiscoverySender(char *ip, char *port)
         response[numbytes] = '\n';
         response[numbytes+1] = '\0';
 
-        printf("Hue Bridge Response: \n");
+        printf("M-SEARCH Response: \n");
 
         puts(response);
 
@@ -144,9 +144,9 @@ char * hueDiscoverySender(char *ip, char *port)
 char * hueAuthorize(char *ip)
 {
     char *authoResponse = NULL;
-    char fields[50] = {0};
+    char fields[128] = {0};
     cJSON *devicetype = NULL;
-    cJSON *generateclientkey = NULL;
+    //cJSON *generateclientkey = NULL;
 
     cJSON *success = NULL;
     cJSON *username = NULL;
@@ -154,57 +154,58 @@ char * hueAuthorize(char *ip)
     cJSON *authoJSON = cJSON_CreateObject();
     if(authoJSON == NULL)
     {
-        perror("ERROR - JSON INIT");
+        perror("ERROR - JSON INIT:");
         return NULL;
     }
 
     devicetype = cJSON_CreateString("HuePi#Macbook Thomas");
     if(devicetype == NULL)
     {
-        perror("ERROR - JSON INIT");
+        perror("ERROR - JSON INIT:");
         return NULL;
     }
 
     cJSON_AddItemToObject(authoJSON, "devicetype", devicetype);
 
-    generateclientkey = cJSON_CreateString("true");
-    if(generateclientkey == NULL)
+    //generateclientkey = cJSON_CreateString("true");
+    //if(generateclientkey == NULL)
+    //{
+    //    perror("ERROR - JSON INIT:");
+    //    return NULL;
+    //}
+
+    //cJSON_AddItemToObject(authoJSON, "generate clientkey", generateclientkey);
+
+    if(sprintf(fields, "Host: %s:80\r\nConnection: closed\r\nContent-Type: application/json\r\n", ip) == -1)
     {
-        perror("ERROR - JSON INIT");
+        perror("ERROR - SPRINTF:");
         return NULL;
     }
 
-    cJSON_AddItemToObject(authoJSON, "generate clientkey", generateclientkey);
-
-
-    sprintf(fields, "Host:%s:80\r\nContent-Type: application/json\r\n", ip);
-
     //s is ip address
-    const cJSON *authoRespJSON = hue_httpPOST(ip, "/api", fields, authoJSON);
+    cJSON *authoRespJSON = hue_httpPOST(ip, "/api", fields, authoJSON);
     if(authoRespJSON == NULL)
     {
         return NULL;
     }
 
-    cJSON_Delete(authoJSON);
-
     authoResponse = cJSON_Print(authoRespJSON);
 
-    printf("Authorization Response: %s\n\n", authoResponse);
+    printf("Authorization Response Body:\n\n%s\n\n", authoResponse);
 
     //checks for JSON "success" if it does not exist, exit program.
     //TODO: implement loop for unsuccessful responses
     success = cJSON_GetObjectItemCaseSensitive(authoRespJSON, "success");
     if(success == NULL)
     {
-        perror("ERROR - Unsuccessful response");
+        printf("SERVER - Unsuccessful response. Closing Program...");
         return NULL;
     }
 
     username = cJSON_GetObjectItemCaseSensitive(success, "username");
     if(username == NULL)
     {
-        perror("ERROR - JSON INIT");
+        perror("ERROR - JSON INIT:");
         return NULL;
     }
 
@@ -214,7 +215,7 @@ char * hueAuthorize(char *ip)
     }
     else
     {
-        perror("ERROR - BAD CLIENT KEY");
+        perror("ERROR - BAD CLIENT KEY:");
         return NULL;
     }
 

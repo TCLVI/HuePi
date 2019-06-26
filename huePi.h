@@ -16,13 +16,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <errno.h>
 
+#include "http_parser.h"
 #include "cJSON.h"
 
 char* hueDiscoverySender(char *ip, char *port);
 
-const cJSON* hue_httpPOST(char *ip, char *URI, char *fields, cJSON *body);
+cJSON* hue_httpPOST(char *ip, char *URI, char *fields, cJSON *body);
 
 char * hueAuthorize(char *ip);
+
+int my_body_callback(http_parser* parser, const char *at, size_t length);
 
 #endif //HUEPI_HUEPI_H
