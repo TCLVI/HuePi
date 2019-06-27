@@ -1,5 +1,5 @@
 //
-// Created by Tommy Lea on 6/4/19.
+// Created by Thomas Lea on 6/4/19.
 /*
  * This is the main driver for running and testing the philips hue bridge controller application
  */
@@ -22,29 +22,25 @@ int main(int argc, char **argv)
 
     char *hueIP = NULL;
 
+    //Captures bridge IP address
     hueIP = hueDiscoverySender(mCastGroup, ssdpPort);
     if(hueIP == NULL)
     {
         return -1;
     }
 
-    printf("IP address is %s\n\n", hueIP);
+    printf("IP address is %s\n", hueIP);
 
     //********************* AUTHORIZATION ***********************
 
     char *clientkey;
 
-    printf("To authorize application with Hue Bridge, press the bridge's link button\n"
-           "at most 30 seconds before starting the authorization, then press enter ~$");
-
-    getchar();
-
-    printf("\nAuthorizing...\n\n");
-
+    //Authorizes application with the bridge, gets username for future API calls
     clientkey = hueAuthorize(hueIP);
-    if(clientkey == NULL)
+    //Checks if program had error, lets the user try again.
+    while(clientkey == NULL)
     {
-        return -1;
+        clientkey = hueAuthorize(hueIP);
     }
 
     printf("Client key is %s\n\n", clientkey);

@@ -1,15 +1,13 @@
 //
-// Created by Tommy Lea on 6/4/19.
+// Created by Thomas Lea on 6/4/19.
 //
 
 #include "huePi.h"
 
 #define MSGBUFSIZE 256
 
-//Takes a socket file descriptor that is open to the multicast address on the ssdp port, and a pointer to the corresponding
-// addrinfo struct. Returns the IP address of the hue bridge after multicasting an M-SEARCH request out and reading back responses
-// from the bridge.
-
+//Function takes multicast ip address and ssdp port number, and multicasts an M-SEARCH packet to discover philips hue bridges
+//Function will return the IP address of the first bridge it discovers
 //Returns null on error
 char * hueDiscoverySender(char *ip, char *port)
 {
@@ -30,12 +28,14 @@ char * hueDiscoverySender(char *ip, char *port)
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
 
+    //Populate bridgeInfo as a linked list of addrinfo structs
     if(getaddrinfo(ip, port, &hints, &bridgeInfo) == -1)
     {
         perror("ERROR - Could not get addr info:");
         return NULL;
     }
 
+    //Loop through addrinfo linked list to create a TCP socket connection with Hue bridge
     for(p = bridgeInfo; p!= NULL; p = p->ai_next)
     {
         if((sfd_mcast = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1)
@@ -55,8 +55,7 @@ char * hueDiscoverySender(char *ip, char *port)
         return NULL;
     }
 
-    //Set up M-Search msg
-
+    //Set up M-Search msg with Hue bridge search-type
     char msg[] = "M-SEARCH * HTTP/1.1\n"
                  "HOST: 239.255.255.250:1900\n"
                  "MAN: ssdp:discover\n"
@@ -73,8 +72,7 @@ char * hueDiscoverySender(char *ip, char *port)
 
     socklen_t len = sizeof(srcAddr);
 
-
-
+    //Loops the multicast search with select
     //i value represents 5 seconds of timeout before multicasting the packet again
     for(int i = 0; i < 5; i++)
     {
@@ -140,16 +138,27 @@ char * hueDiscoverySender(char *ip, char *port)
     return NULL;
 }
 
-//Takes ip address of hue bridge. Returns client key
+//Takes ip address of hue bridge. Returns client username on success.
+//Returns NULL on program error, and 0 on unsuccessful responses.
 char * hueAuthorize(char *ip)
 {
+    printf("\nTo authorize application with Hue Bridge, press the bridge's link button\n"
+           "at most 30 seconds before starting the authorization, then press enter ~$");
+
+    getchar();
+
+    printf("\nAuthorizing...\n\n");
+
     char *authoResponse = NULL;
     char fields[128] = {0};
     cJSON *devicetype = NULL;
     //cJSON *generateclientkey = NULL;
 
+    cJSON *authoRespJSON = NULL;
     cJSON *success = NULL;
     cJSON *username = NULL;
+    cJSON *error = NULL;
+    cJSON *description = NULL;
 
     cJSON *authoJSON = cJSON_CreateObject();
     if(authoJSON == NULL)
@@ -183,23 +192,55 @@ char * hueAuthorize(char *ip)
     }
 
     //s is ip address
-    cJSON *authoRespJSON = hue_httpPOST(ip, "/api", fields, authoJSON);
-    if(authoRespJSON == NULL)
+    cJSON *authoRespJSONArray = hue_httpPOST(ip, "/api", fields, authoJSON);
+    if(authoRespJSONArray == NULL)
     {
         return NULL;
     }
 
-    authoResponse = cJSON_Print(authoRespJSON);
+    authoResponse = cJSON_Print(authoRespJSONArray);
 
     printf("Authorization Response Body:\n\n%s\n\n", authoResponse);
 
-    //checks for JSON "success" if it does not exist, exit program.
-    //TODO: implement loop for unsuccessful responses
+    authoRespJSON = cJSON_GetArrayItem(authoRespJSONArray, 0);
+    if(authoRespJSON == NULL)
+    {
+        perror("ERROR - JSON ARRAY ITEM GRAB:");
+        return NULL;
+    }
+
+    //checks for JSON "success" if it does not exist, checks for error messages and allows user to try authorization again
     success = cJSON_GetObjectItemCaseSensitive(authoRespJSON, "success");
     if(success == NULL)
     {
-        printf("SERVER - Unsuccessful response. Closing Program...");
-        return NULL;
+        error = cJSON_GetObjectItemCaseSensitive(authoRespJSON, "error");
+        {
+            if(error == NULL)
+            {
+                perror("ERROR - Bad response:");
+                return NULL;
+            }
+            else
+            {
+                description = cJSON_GetObjectItemCaseSensitive(error, "description");
+                {
+                    if(description == NULL)
+                    {
+                        perror("ERROR - RESPONSE JSON NOT FOUND:");
+                        return NULL;
+                    }
+                    else
+                    {
+                        printf("SERVER - Failed authorization: %s\nPress enter to begin authorization process again."
+                               " ~$", description->valuestring);
+
+                        getchar();
+
+                        return NULL;
+                    }
+                }
+            }
+        }
     }
 
     username = cJSON_GetObjectItemCaseSensitive(success, "username");
@@ -219,7 +260,7 @@ char * hueAuthorize(char *ip)
         return NULL;
     }
 
-    cJSON_Delete(authoRespJSON);
+    cJSON_Delete(authoRespJSONArray);
     return username->valuestring;
 }
 

@@ -1,6 +1,9 @@
 //
 // Created by Tommy Lea on 6/4/19.
-//
+/*
+ * HuePi is a project/library written by Thomas Lea. It aims to give the user a simple API for controlling many of the
+ * applications of a Philips Hue bridge.
+ */
 
 #ifndef HUEPI_HUEPI_H
 #define HUEPI_HUEPI_H
